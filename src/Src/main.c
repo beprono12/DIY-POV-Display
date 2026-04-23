@@ -49,15 +49,18 @@ TIM_HandleTypeDef htim2;
 
 // Font chữ "bạn chọn" (Cao 8 pixel, rộng 5 pixel)
 // Được ánh xạ vào 8 LED đầu tiên (PA0 đến PA7), 2 LED PB0 PB1 để tắt làm viền dưới
-const uint16_t FONT_CR7[5][5] = {
-	{0x000E, 0x001F, 0x003E, 0x001F, 0x000E}, // Trái tim (Heart)
-    {0x003E, 0x0041, 0x0041, 0x0041, 0x0022}, // C
-    {0x007F, 0x0009, 0x0019, 0x0029, 0x0046}, // R
-    {0x0001, 0x0071, 0x0009, 0x0005, 0x0003},  // 7
-	{0x000E, 0x001F, 0x003E, 0x001F, 0x000E} // Trái tim (Heart)
+const uint16_t FONT_CR7[8][5] = {
+		 {0x000E, 0x001F, 0x003E, 0x001F, 0x000E}, // Trái tim (Heart)
+		 {0x0000, 0x0000, 0x0000, 0x0000, 0x0000}, // Space (Khoảng trắng)
+		  {0x003E, 0x0041, 0x0041, 0x0041, 0x0022}, // C
+		 {0x007F, 0x0049, 0x0049, 0x0049, 0x0041}, // E
+		 {0x007F, 0x0049, 0x0049, 0x0049, 0x0041}, // E
+		  {0x003E, 0x0041, 0x0041, 0x0041, 0x0022}, // C
+		 {0x0000, 0x0000, 0x0000, 0x0000, 0x0000}, // Space (Khoảng trắng)
+		 {0x000E, 0x001F, 0x003E, 0x001F, 0x000E} // Trái tim (Heart)
 };
 
-// Font chữ số Đồng hồ (0-9 và dấu 2 chấm)
+// Font chữ số Đồng hồ (0-9 và dấu :)
 const uint16_t FONT_CLOCK[11][5] = {
     {0x003E, 0x0051, 0x0049, 0x0045, 0x003E}, // 0
     {0x0000, 0x0042, 0x007F, 0x0040, 0x0000}, // 1
@@ -74,13 +77,13 @@ const uint16_t FONT_CLOCK[11][5] = {
 
 // --- CÔNG TẮC CHỌN CHẾ ĐỘ ---
 // Thay đổi số này: 0 = Hiển thị chữ , 1 = Hiển thị Đồng hồ
-uint8_t display_mode = 1;
+uint8_t display_mode = 0;
 
-volatile uint8_t sync_flag = 0;
-volatile uint32_t rotation_time_us = 0;
-volatile uint32_t last_interrupt_time = 0;
-// Biến lưu thời gian đọc từ RTC
-uint32_t last_rtc_read = 0;
+volatile uint8_t sync_flag = 0; // báo hiệu hết 1 vòng
+volatile uint32_t rotation_time_us = 0; // thời gian quay 1 vòng
+volatile uint32_t last_interrupt_time = 0; // mốc thời gian từng vòng, hỗ trợ tính thời gian quay 1 vòng
+
+uint32_t last_rtc_read = 0; // Biến lưu thời gian đọc từ RTC
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -94,21 +97,20 @@ void delay_us(uint16_t us);
 uint8_t bcd_to_dec(uint8_t val);
 void RTC_GetTime(uint8_t *h, uint8_t *m, uint8_t *s);
 void POV_WriteColumn(uint16_t column_data);
-void POV_DisplayChar(char c);
-void POV_DisplayString(char* str);
+
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-// 1. Hàm trễ vi giây (An toàn cho Timer 16-bit)
+// 1. Hàm trễ micro-giây, tạo độ trễ chính xác
 void delay_us(uint16_t us) {
     uint16_t start = __HAL_TIM_GET_COUNTER(&htim2);
     while ((uint16_t)(__HAL_TIM_GET_COUNTER(&htim2) - start) < us);
 }
 
-// 2. Hàm xuất tín hiệu siêu tốc bằng thanh ghi BSRR (Cho PA0-PA7 và PB0-PB1)
+// 2. Hàm xuất dữ liệu siêu tốc bằng thanh ghi BSRR thay vì hàm HAL
 void POV_WriteColumn(uint16_t column_data) {
     uint16_t portA_data = column_data & 0x00FF; // Lấy 8 bit thấp cho PA0-PA7
     uint16_t portB_data = (column_data & 0x0300) >> 8; // Lấy bit 8, 9 cho PB0-PB1
@@ -190,12 +192,14 @@ int main(void)
       HAL_TIM_Base_Start(&htim2);
       // BỎ COMMENT DÒNG DƯỚI ĐÂY ĐỂ NẠP GIỜ VN HIỆN TẠI VÀO MẠCH
       // Sau khi nạp code chạy thử lần 1,comment dòng này lại (//) và nạp lại code lần 2
-     // RTC_SetTime(23, 15, 00);
+
+      // RTC_SetTime(23, 15, 00);
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+
       // Tạo mảng chứa 8 ký tự của đồng hồ: H H : M M : S S
         uint8_t clock_digits[8] = {0,0,10,0,0,10,0,0};
   while (1)
@@ -212,10 +216,10 @@ int main(void)
 	                // Tách các con số để đưa vào mảng hiển thị (VD: 22 -> 2 và 2)
 	                clock_digits[0] = hr / 10;
 	                clock_digits[1] = hr % 10;
-	                // clock_digits[2] = 10 (Là dấu hai chấm, đã cấu hình mặc định)
+	                // clock_digits[2] = 10 (:);
 	                clock_digits[3] = min / 10;
 	                clock_digits[4] = min % 10;
-	                // clock_digits[5] = 10 (Là dấu hai chấm)
+	                // clock_digits[5] = 10 (:);
 	                clock_digits[6] = sec / 10;
 	                clock_digits[7] = sec % 10;
 	            }
@@ -253,11 +257,10 @@ int main(void)
 	            // LỰA CHỌN 2: VẼ CHỮ hay display == 0
 	            // ==========================================
 	            else {
-	                for (int i = 0; i < 5; i++) {
+	                for (int i = 0; i < 8; i++) { // i < số lượng ký tự
 	                    for (int col = 0; col < 5; col++) {
 	                        POV_WriteColumn(FONT_CR7[i][col]);
 	                        delay_us(col_delay);
-
 	                        POV_WriteColumn(0x0000);
 	                        delay_us(col_delay / 2);
 	                    }
