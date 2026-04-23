@@ -1,0 +1,12 @@
+../Src/main.c:106:6:delay_us	24	static
+../Src/main.c:112:6:POV_WriteColumn	24	static
+../Src/main.c:122:6:HAL_GPIO_EXTI_Callback	24	static
+../Src/main.c:137:9:bcdToDec	16	static
+../Src/main.c:142:9:decToBcd	16	static
+../Src/main.c:147:6:RTC_SetTime	40	static
+../Src/main.c:161:5:main	64	static
+../Src/main.c:282:6:SystemClock_Config	72	static
+../Src/main.c:321:13:MX_I2C1_Init	8	static
+../Src/main.c:355:13:MX_TIM2_Init	32	static
+../Src/main.c:400:13:MX_GPIO_Init	40	static
+../Src/main.c:456:6:Error_Handler	4	static,ignoring_inline_asm

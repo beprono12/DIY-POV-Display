@@ -1,0 +1,12 @@
+../Src/main.c:106:6:delay_us	2
+../Src/main.c:112:6:POV_WriteColumn	1
+../Src/main.c:122:6:HAL_GPIO_EXTI_Callback	3
+../Src/main.c:137:9:bcdToDec	1
+../Src/main.c:142:9:decToBcd	1
+../Src/main.c:147:6:RTC_SetTime	1
+../Src/main.c:161:5:main	10
+../Src/main.c:282:6:SystemClock_Config	3
+../Src/main.c:321:13:MX_I2C1_Init	2
+../Src/main.c:355:13:MX_TIM2_Init	4
+../Src/main.c:400:13:MX_GPIO_Init	1
+../Src/main.c:456:6:Error_Handler	1
