@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
@@ -41,7 +42,6 @@
 
 /* Private variables ---------------------------------------------------------*/
 I2C_HandleTypeDef hi2c1;
-
 TIM_HandleTypeDef htim2;
 
 /* USER CODE BEGIN PV */
@@ -49,13 +49,13 @@ TIM_HandleTypeDef htim2;
 
 // Font chữ "bạn chọn" (Cao 8 pixel, rộng 5 pixel)
 // Được ánh xạ vào 8 LED đầu tiên (PA0 đến PA7), 2 LED PB0 PB1 để tắt làm viền dưới
-const uint16_t FONT_CR7[8][5] = {
+const uint16_t FONT_CHU[8][5] = {
 		 {0x000E, 0x001F, 0x003E, 0x001F, 0x000E}, // Trái tim (Heart)
 		 {0x0000, 0x0000, 0x0000, 0x0000, 0x0000}, // Space (Khoảng trắng)
-		  {0x003E, 0x0041, 0x0041, 0x0041, 0x0022}, // C
+		 {0x003E, 0x0041, 0x0041, 0x0041, 0x0022}, // C
 		 {0x007F, 0x0049, 0x0049, 0x0049, 0x0041}, // E
 		 {0x007F, 0x0049, 0x0049, 0x0049, 0x0041}, // E
-		  {0x003E, 0x0041, 0x0041, 0x0041, 0x0022}, // C
+		 {0x003E, 0x0041, 0x0041, 0x0041, 0x0022}, // C
 		 {0x0000, 0x0000, 0x0000, 0x0000, 0x0000}, // Space (Khoảng trắng)
 		 {0x000E, 0x001F, 0x003E, 0x001F, 0x000E} // Trái tim (Heart)
 };
@@ -77,7 +77,7 @@ const uint16_t FONT_CLOCK[11][5] = {
 
 // --- CÔNG TẮC CHỌN CHẾ ĐỘ ---
 // Thay đổi số này: 0 = Hiển thị chữ , 1 = Hiển thị Đồng hồ
-uint8_t display_mode = 0;
+uint8_t display_mode = 1;
 
 volatile uint8_t sync_flag = 0; // báo hiệu hết 1 vòng
 volatile uint32_t rotation_time_us = 0; // thời gian quay 1 vòng
@@ -183,17 +183,17 @@ int main(void)
 
   /* USER CODE END SysInit */
 
-  /* Khởi tạo tất cả các ngoại vi đã được cấu hình */
+  /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_I2C1_Init();
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
 
-      HAL_TIM_Base_Start(&htim2);
+      HAL_TIM_Base_Start(&htim2); // khởi động bộ đếm
+
       // BỎ COMMENT DÒNG DƯỚI ĐÂY ĐỂ NẠP GIỜ VN HIỆN TẠI VÀO MẠCH
       // Sau khi nạp code chạy thử lần 1,comment dòng này lại (//) và nạp lại code lần 2
-
-      // RTC_SetTime(23, 15, 00);
+      // RTC_SetTime(giờ, phút, giây); - tự nhập số
 
   /* USER CODE END 2 */
 
@@ -202,21 +202,22 @@ int main(void)
 
       // Tạo mảng chứa 8 ký tự của đồng hồ: H H : M M : S S
         uint8_t clock_digits[8] = {0,0,10,0,0,10,0,0};
-  while (1)
+
+        while (1)
   {
 	  // --- NẾU ĐANG Ở CHẾ ĐỘ ĐỒNG HỒ: ĐỌC RTC MỖI DƯỚI 1 GIÂY ---
 	        if (display_mode == 1 && (HAL_GetTick() - last_rtc_read > 1000)) {
 	            uint8_t rtcData[3];
-	            // Đọc 3 byte thời gian từ DS3231
+	            // Đọc 3 byte thời gian (giờ, phút, giây) từ DS3231
 	            if (HAL_I2C_Mem_Read(&hi2c1, 0xD0, 0x00, 1, rtcData, 3, 100) == HAL_OK) {
 	                uint8_t sec = bcdToDec(rtcData[0] & 0x7F);
 	                uint8_t min = bcdToDec(rtcData[1]);
 	                uint8_t hr  = bcdToDec(rtcData[2] & 0x3F);
 
-	                // Tách các con số để đưa vào mảng hiển thị (VD: 22 -> 2 và 2)
+	                // Tách các con số để đưa vào mảng hiển thị
 	                clock_digits[0] = hr / 10;
 	                clock_digits[1] = hr % 10;
-	                // clock_digits[2] = 10 (:);
+	                // clock_digits[2] = 10 (:); - đã cấu hình ở trên
 	                clock_digits[3] = min / 10;
 	                clock_digits[4] = min % 10;
 	                // clock_digits[5] = 10 (:);
@@ -225,16 +226,14 @@ int main(void)
 	            }
 	            last_rtc_read = HAL_GetTick(); // Cập nhật lại mốc thời gian
 	        }
-
 	        // --- TIẾN HÀNH QUÉT LED KHI NAM CHÂM LƯỚT QUA ---
 	        if (sync_flag == 1) {
 	            sync_flag = 0;
-
-	            // Tính toán độ rộng của nét chữ (Chia 150 vòng tròn)
-	            uint32_t col_delay = rotation_time_us / 160;
+	            // Tính toán độ rộng của nét chữ (Chia chu vi vòng tròn n lát  => rotation_time_us/ n;
+	            uint32_t col_delay = rotation_time_us / 160; // trường hợp n = 160
 	            uint32_t offset_delay = rotation_time_us / 6;
-
 	            delay_us(offset_delay);
+
 
 	            // ==========================================
 	            // LỰA CHỌN 1: VẼ ĐỒNG HỒ hay display == 1
@@ -259,7 +258,7 @@ int main(void)
 	            else {
 	                for (int i = 0; i < 8; i++) { // i < số lượng ký tự
 	                    for (int col = 0; col < 5; col++) {
-	                        POV_WriteColumn(FONT_CR7[i][col]);
+	                        POV_WriteColumn(FONT_CHU[i][col]);
 	                        delay_us(col_delay);
 	                        POV_WriteColumn(0x0000);
 	                        delay_us(col_delay / 2);
@@ -290,12 +289,13 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+  RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
-  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI_DIV2;
-  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL16;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
+  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -416,9 +416,11 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3
                           |GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_6|GPIO_PIN_7, GPIO_PIN_RESET);
 
+  /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0|GPIO_PIN_1, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : PA0 PA1 PA2 PA3 PA4 PA5 PA6 PA7 */
+  /*Configure GPIO pins : PA0 PA1 PA2 PA3
+                           PA4 PA5 PA6 PA7 */
   GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3
                           |GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_6|GPIO_PIN_7;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
